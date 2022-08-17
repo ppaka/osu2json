@@ -28,10 +28,12 @@ namespace osu2json
         public float difficultyLevel;
 
         public string audioPath = "";
-        public float audioPreviewTime = 0;
+        public int audioPreviewTime = 0;
         public string level4KFilePath = "", level9KFilePath = "";
         public string videoPath = "";
         public string backgroundImagePath = "";
         public string iconImagePath = "";
+
+        public Dictionary<string, string> subtitlePaths = new Dictionary<string, string>();
     }
 }

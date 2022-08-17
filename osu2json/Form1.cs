@@ -69,10 +69,10 @@ namespace osu2json
                 info.creator = key4Lv.MetadataSection.Creator;
                 info.difficultyName = key4Lv.MetadataSection.Version;
                 info.difficultyLevel = 1;
-                info.audioPath = key4Lv.GeneralSection.AudioFilename == null ? "" : key4Lv.GeneralSection.AudioFilename;
-                info.audioPreviewTime = key4Lv.GeneralSection.PreviewTime * 0.001f;
-                info.videoPath = key4Lv.EventsSection.Video== null? "": key4Lv.EventsSection.Video;
-                info.backgroundImagePath = key4Lv.EventsSection.BackgroundImage==null? "" : key4Lv.EventsSection.BackgroundImage;
+                info.audioPath = key4Lv.GeneralSection.AudioFilename ?? "";
+                info.audioPreviewTime = key4Lv.GeneralSection.PreviewTime;
+                info.videoPath = key4Lv.EventsSection.Video ?? "";
+                info.backgroundImagePath = key4Lv.EventsSection.BackgroundImage ?? "";
                 info.level4KFilePath = Path.GetFileName(textBox1.Text);
                 if (!text2_is_null) info.level9KFilePath = Path.GetFileName(textBox2.Text);
                 level.info = info;
@@ -98,10 +98,10 @@ namespace osu2json
                 info.creator = key9Lv.MetadataSection.Creator;
                 info.difficultyName = key9Lv.MetadataSection.Version;
                 info.difficultyLevel = 1;
-                info.audioPath = key9Lv.GeneralSection.AudioFilename == null ? "" : key9Lv.GeneralSection.AudioFilename;
-                info.audioPreviewTime = key9Lv.GeneralSection.PreviewTime * 0.001f;
-                info.videoPath = key9Lv.EventsSection.Video == null ? "" : key9Lv.EventsSection.Video;
-                info.backgroundImagePath = key9Lv.EventsSection.BackgroundImage == null ? "" : key9Lv.EventsSection.BackgroundImage;
+                info.audioPath = key9Lv.GeneralSection.AudioFilename ?? "";
+                info.audioPreviewTime = key9Lv.GeneralSection.PreviewTime;
+                info.videoPath = key9Lv.EventsSection.Video ?? "";
+                info.backgroundImagePath = key9Lv.EventsSection.BackgroundImage ?? "";
                 info.level9KFilePath = Path.GetFileName(textBox2.Text);
                 level.info = info;
 
