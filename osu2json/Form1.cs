@@ -1,14 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using OsuParsers;
+using OsuParsers.Beatmaps.Objects;
 
 namespace osu2json
 {
@@ -19,103 +13,210 @@ namespace osu2json
             InitializeComponent();
         }
 
-        private string getPath()
+        private string GetPath()
         {
             var dialog = openFileDialog1.ShowDialog();
-            if (dialog == DialogResult.OK)
-            {
-                return openFileDialog1.FileName;
-            }
-            return null;
+            return dialog == DialogResult.OK ? openFileDialog1.FileName : null;
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            var path = getPath();
+            var path = GetPath();
             textBox1.Text = path ?? textBox1.Text;
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-            var path = getPath();
-            textBox2.Text = path ?? textBox2.Text;
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
-            bool text1_is_null = false, text2_is_null = false;
-            Level level = new Level();
+            var text1IsNull = false;
+            var level = new Level();
             if (textBox1.Text == "")
             {
-                text1_is_null = true;
-            }
-            if (textBox2.Text == "")
-            {
-                text2_is_null = true;
+                text1IsNull = true;
             }
 
-            if (text1_is_null && text2_is_null)
+            if (text1IsNull)
             {
                 MessageBox.Show("선택한 파일이 없습니다", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-
-            if (!text1_is_null)
+            
+            var beatmap = OsuParsers.Decoders.BeatmapDecoder.Decode(textBox1.Text);
+            beatmap.HitObjects.ForEach(x =>
             {
-                var info = new Info();
-                var key4Lv = OsuParsers.Decoders.BeatmapDecoder.Decode(textBox1.Text);
-                info.title = key4Lv.MetadataSection.Title;
-                info.artist = key4Lv.MetadataSection.Artist;
-                info.creator = key4Lv.MetadataSection.Creator;
-                info.difficultyName = key4Lv.MetadataSection.Version;
-                info.difficultyLevel = 1;
-                info.audioPath = key4Lv.GeneralSection.AudioFilename ?? "";
-                info.audioPreviewTime = key4Lv.GeneralSection.PreviewTime;
-                info.videoPath = key4Lv.EventsSection.Video ?? "";
-                info.backgroundImagePath = key4Lv.EventsSection.BackgroundImage ?? "";
-                info.level4KFilePath = Path.GetFileName(textBox1.Text);
-                if (!text2_is_null) info.level9KFilePath = Path.GetFileName(textBox2.Text);
-                level.info = info;
-
-                var settings = new Newtonsoft.Json.JsonSerializerSettings
+                if (x.GetType() == typeof(Spinner))
                 {
-                    Formatting = Newtonsoft.Json.Formatting.Indented
-                };
-                var jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(level, settings);
-                var dialog = saveFileDialog1.ShowDialog();
-                if (dialog == DialogResult.OK)
-                {
-                    File.WriteAllText(saveFileDialog1.FileName, jsonData);
-                    MessageBox.Show("변환 성공", "작업 알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    var noteData = new NoteData
+                    {
+                        startTime = x.StartTime,
+                        y = 0.5f
+                    };
+                    level.notes.Add(noteData);
                 }
-            }
-            else
+                else
+                {
+                    var noteData = new NoteData
+                    {
+                        type = 0,
+                        direction = 0
+                    };
+
+                    var lane = 2;
+                    if (!checkBox1.Checked)
+                    {
+                        lane = (int)Math.Floor(x.Position.X * 5 / 512f);
+                        if (lane < 0) lane = 0;
+                        else if (lane > 4) lane = 4;
+
+                        switch (lane)
+                        {
+                            case 2:
+                                noteData.type = 0;
+                                noteData.direction = 0;
+                                break;
+                            case 1:
+                                noteData.type = 1;
+                                noteData.direction = -1;
+                                break;
+                            case 3:
+                                noteData.type = 1;
+                                noteData.direction = 1;
+                                break;
+                            case 0:
+                                noteData.type = 2;
+                                noteData.direction = -1;
+                                break;
+                            case 4:
+                                noteData.type = 2;
+                                noteData.direction = 1;
+                                break;
+                        }
+                    }
+
+                    noteData.startTime = x.StartTime * 0.001f;
+                    noteData.y = 1f - x.Position.Y / 384f;
+                    level.notes.Add(noteData);
+
+                    if (x.StartTime >= x.EndTime) return;
+                    if (x.GetType() != typeof(Slider)) return;
+                    var slider = (Slider)x;
+                    var singleRepeatTime = (float)x.TotalTimeSpan.TotalMilliseconds / slider.Repeats * 0.001f;
+
+                    var lastLane = 2;
+                    if (!checkBox1.Checked) lastLane = (int)Math.Floor(slider.SliderPoints.First().X * 5 / 512f);
+                    if (lastLane < 0) lastLane = 0;
+                    else if (lastLane > 4) lastLane = 4;
+                    var lastPoint = 1f - slider.SliderPoints.First().Y / 384f;
+
+                    if (slider.Repeats != 0)
+                    {
+                        for (var i = 1; i < slider.Repeats; i++)
+                        {
+                            var noteData2 = new NoteData();
+                            int lane2;
+                            if (i % 2 == 0)
+                            {
+                                noteData2.y = noteData.y;
+                                lane2 = lane;
+                            }
+                            else
+                            {
+                                noteData2.y = lastPoint;
+                                lane2 = lastLane;
+                            }
+                            noteData2.startTime = noteData.startTime + singleRepeatTime * i;
+
+                            switch (lane2)
+                            {
+                                case 2:
+                                    noteData2.type = 0;
+                                    noteData2.direction = 0;
+                                    break;
+                                case 1:
+                                    noteData2.type = 1;
+                                    noteData2.direction = -1;
+                                    break;
+                                case 3:
+                                    noteData2.type = 1;
+                                    noteData2.direction = 1;
+                                    break;
+                                case 0:
+                                    noteData2.type = 2;
+                                    noteData2.direction = -1;
+                                    break;
+                                case 4:
+                                    noteData2.type = 2;
+                                    noteData2.direction = 1;
+                                    break;
+                            }
+
+                            level.notes.Add(noteData2);
+                        }
+                    }
+                    
+                    var noteData3 = new NoteData();
+                    int lane3;
+
+                    if (slider.Repeats != 0)
+                    {
+                        if (slider.Repeats % 2 == 0)
+                        {
+                            noteData3.y = noteData.y;
+                            lane3 = lane;
+                        }
+                        else
+                        {
+                            noteData3.y = lastPoint;
+                            lane3 = lastLane;
+                        }
+                    }
+                    else
+                    {
+                        noteData3.y = lastPoint;
+                        lane3 = lastLane;
+                    }
+
+                    switch (lane3)
+                    {
+                        case 2:
+                            noteData3.type = 0;
+                            noteData3.direction = 0;
+                            break;
+                        case 1:
+                            noteData3.type = 1;
+                            noteData3.direction = -1;
+                            break;
+                        case 3:
+                            noteData3.type = 1;
+                            noteData3.direction = 1;
+                            break;
+                        case 0:
+                            noteData3.type = 2;
+                            noteData3.direction = -1;
+                            break;
+                        case 4:
+                            noteData3.type = 2;
+                            noteData3.direction = 1;
+                            break;
+                    }
+
+                    noteData3.startTime = x.EndTime * 0.001f;
+                    level.notes.Add(noteData3);
+                }
+            });
+
+
+            var settings = new Newtonsoft.Json.JsonSerializerSettings
             {
-                var info = new Info();
-                var key9Lv = OsuParsers.Decoders.BeatmapDecoder.Decode(textBox2.Text);
-                info.title = key9Lv.MetadataSection.Title;
-                info.artist = key9Lv.MetadataSection.Artist;
-                info.creator = key9Lv.MetadataSection.Creator;
-                info.difficultyName = key9Lv.MetadataSection.Version;
-                info.difficultyLevel = 1;
-                info.audioPath = key9Lv.GeneralSection.AudioFilename ?? "";
-                info.audioPreviewTime = key9Lv.GeneralSection.PreviewTime;
-                info.videoPath = key9Lv.EventsSection.Video ?? "";
-                info.backgroundImagePath = key9Lv.EventsSection.BackgroundImage ?? "";
-                info.level9KFilePath = Path.GetFileName(textBox2.Text);
-                level.info = info;
-
-                var settings = new Newtonsoft.Json.JsonSerializerSettings
-                {
-                    Formatting = Newtonsoft.Json.Formatting.Indented
-                };
-                var jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(level, settings);
-                var dialog = saveFileDialog1.ShowDialog();
-                if (dialog == DialogResult.OK)
-                {
-                    File.WriteAllText(saveFileDialog1.FileName, jsonData);
-                    MessageBox.Show("변환 성공", "작업 알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                Formatting = Newtonsoft.Json.Formatting.Indented
+            };
+            var jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(level, settings);
+            saveFileDialog1.AddExtension = true;
+            saveFileDialog1.Filter = "JSON 텍스트 파일 (*.json)|*.json";
+            var dialog = saveFileDialog1.ShowDialog();
+            if (dialog == DialogResult.OK)
+            {
+                File.WriteAllText(saveFileDialog1.FileName, jsonData);
+                MessageBox.Show("변환 성공", "결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
     }
